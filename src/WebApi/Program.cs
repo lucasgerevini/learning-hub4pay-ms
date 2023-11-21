@@ -18,7 +18,7 @@ app.UseSwaggerUI();
 
 app.UseHttpsRedirection();
 
-app.MapGet("/", (HttpContext context) =>
+app.MapGet("/",() =>
 {
         return System.IO.File.ReadAllTextAsync("log.txt");
 })
