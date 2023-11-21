@@ -1,3 +1,7 @@
+using System.Text;
+using System.Text.Json;
+using System.Text.Json.Serialization;
+
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
@@ -14,31 +18,51 @@ app.UseSwaggerUI();
 
 app.UseHttpsRedirection();
 
-app.MapGet("/", () =>
+app.MapGet("/", (HttpContext context) =>
 {
-    return System.IO.File.ReadAllTextAsync("log.txt");
-
+        return System.IO.File.ReadAllTextAsync("log.txt");
 })
 .WithName("Get");
 
 
-app.MapPost("/", (HttpContext context) =>//async context =>
+app.MapPost("/", (HttpContext context) =>
 {
-    //Código existente para registrar a requisição no arquivo de log
-    var request = context.Request;
-    var requestInfo = new
+    try
     {
-        Date = DateTime.Now,
-        Method = request.Method,
-        Path = request.Path,
-        QueryString = request.QueryString,
-        Headers = request.Headers,
-        Body = new System.IO.StreamReader(request.Body).ReadToEndAsync().Result,
-    };
-    context.Response.WriteAsync("Requisição registrada com sucesso!");
+        //Código existente para registrar a requisição no arquivo de log
+        var request = context.Request;
+
+        // Converte os cabeçalhos em uma única string separada por "|"
+        var cabecalhosString = ConvertHeadersToString(context.Request.Headers);
+
+        IFormCollection corpoRequisicao = null;
+
+        if (EhContextType(context.Request.Headers))
+        {
+            // Desserializa o corpo da requisição
+            corpoRequisicao = context.Request.ReadFormAsync()?.Result;
+        }
+
+        var requestInfo = new
+        {
+            Date = DateTime.Now,
+            Method = request.Method,
+            Path = request.Path,
+            QueryString = request.QueryString,
+            Headers = cabecalhosString,
+            Body = corpoRequisicao is null ? new System.IO.StreamReader(request.Body).ReadToEndAsync().Result : corpoRequisicao?.FirstOrDefault().Value.ToString(),
+        };
+        System.IO.File.AppendAllTextAsync("log.txt", requestInfo.ToString() + Environment.NewLine);
+        context.Response.WriteAsync("Requisição registrada com sucesso!");
+    }
+    catch (Exception ex)
+    {
+        context.Response.StatusCode = 500;
+        context.Response.WriteAsync($"Erro ao registrar o arquivo de log: {ex.Message}");
+        System.IO.File.AppendAllTextAsync("log.txt", ex.Message + Environment.NewLine);
+    }
 })
 .WithName("Post");
-
 
 app.MapDelete("/", (HttpContext context) =>
 {
@@ -55,5 +79,22 @@ app.MapDelete("/", (HttpContext context) =>
 })
 .WithName("Delete");
 
-
 app.Run();
+
+
+bool EhContextType(IHeaderDictionary headers)
+{
+    return headers.FirstOrDefault(f => f.Key == "Content-Type").Value.ToString() == "application/x-www-form-urlencoded";
+}
+
+string ConvertHeadersToString(IHeaderDictionary headers)
+{
+    var stringBuilder = new StringBuilder();
+
+    foreach (var (key, values) in headers)
+    {
+        stringBuilder.Append($"{key}: {string.Join(", ", values)}|");
+    }
+
+    return stringBuilder.ToString().TrimEnd('|');
+}
