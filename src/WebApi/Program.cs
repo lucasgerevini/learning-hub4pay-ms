@@ -8,17 +8,15 @@ builder.Services.AddSwaggerGen();
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.
-if (app.Environment.IsDevelopment())
-{
-    app.UseSwagger();
-    app.UseSwaggerUI();
-}
+
+app.UseSwagger();
+app.UseSwaggerUI();
 
 app.UseHttpsRedirection();
 
 app.MapGet("/", () =>
 {
-       return System.IO.File.ReadAllTextAsync("log.txt");
+    return System.IO.File.ReadAllTextAsync("log.txt");
 
 })
 .WithName("Get");
@@ -30,13 +28,13 @@ app.MapPost("/", (HttpContext context) =>//async context =>
     var request = context.Request;
     var requestInfo = new
     {
+        Date = DateTime.Now,
         Method = request.Method,
         Path = request.Path,
         QueryString = request.QueryString,
         Headers = request.Headers,
-        Body = new System.IO.StreamReader(request.Body).ReadToEndAsync()
+        Body = new System.IO.StreamReader(request.Body).ReadToEndAsync().Result,
     };
-    System.IO.File.AppendAllTextAsync("log.txt", requestInfo.ToString() + Environment.NewLine);
     context.Response.WriteAsync("Requisição registrada com sucesso!");
 })
 .WithName("Post");
